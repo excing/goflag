@@ -1,4 +1,4 @@
-package main
+package goflag
 
 import (
 	"encoding/json"
