@@ -122,32 +122,44 @@ func Lower(s string) string {
 
 var fields = make(map[string]reflect.Value)
 
-// Flag only supports basic types of flag configuration
-func Flag(name string, value interface{}, usage string) {
-	valueField := reflect.ValueOf(value).Elem()
-	flagVar(name, valueField, usage)
-}
+// Var only supports struct type flag configuration
+func Var(value interface{}, args ...string) {
+	v := reflect.ValueOf(value).Elem()
 
-// FlagVar only supports struct type flag configuration
-func FlagVar(config interface{}) {
-	v := reflect.ValueOf(config).Elem()
+	switch v.Kind() {
+	case reflect.String, reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Bool, reflect.Float32, reflect.Float64, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		if 2 != len(args) {
+			panic("The name and usage of the flag are not filled in")
+		}
+		flagVar(args[0], v, args[1])
+	case reflect.Struct:
+		if 0 < len(args) {
+			panic("No more parameters except value")
+		}
+		// Name of the struct tag used
+		const tagName = "flag"
 
-	// Name of the struct tag used
-	const tagName = "flag"
+		for i := 0; i < v.NumField(); i++ {
+			valueField := v.Field(i)
+			typeField := v.Type().Field(i)
 
-	for i := 0; i < v.NumField(); i++ {
-		valueField := v.Field(i)
-		typeField := v.Type().Field(i)
+			name := Lower(typeField.Name)
+			usage := typeField.Tag.Get(tagName)
 
-		name := Lower(typeField.Name)
-		usage := typeField.Tag.Get(tagName)
+			if "" == usage {
+				panic(name + " variable does not use the flag tag")
+			}
 
-		flagVar(name, valueField, usage)
+			flagVar(name, valueField, usage)
+		}
+	default:
+		panic("Value is an unsupported parameter type, please see: https://github.com/excing/goflag")
 	}
+
 }
 
-// FlagParse parse flag
-func FlagParse(name string, usage string) {
+// Parse parse flag
+func Parse(name string, usage string) {
 	var configPath string
 	flag.StringVar(&configPath, name, "", usage)
 
@@ -231,6 +243,8 @@ func flagVar(name string, value reflect.Value, usage string) {
 		flag.Var(FloatValue{value}, name, usage)
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		flag.Var(FloatValue{value}, name, usage)
+	default:
+		panic("Value is an unsupported parameter type, please see: https://github.com/excing/goflag")
 	}
 	fields[name] = value
 }
